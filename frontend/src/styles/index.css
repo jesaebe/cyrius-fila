@@ -1,0 +1,16 @@
+/* Ocultar tudo na tela quando estiver imprimindo */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  
+  .print-ticket, .print-ticket * {
+    visibility: visible;
+  }
+
+  .print-ticket {
+    width: 220px; /* largura de impressora térmica */
+    margin: auto;
+    font-family: "Arial", sans-serif;
+  }
+}

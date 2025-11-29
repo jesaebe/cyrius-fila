@@ -8,6 +8,7 @@ RUN npm install
 
 COPY index.html ./
 COPY src ./src
+COPY . .
 
 RUN npm install react-router-dom --force
 

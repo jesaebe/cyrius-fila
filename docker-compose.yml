@@ -31,7 +31,10 @@ services:
       - backend
     ports:
       - "5174:5173"
-    command: npm run dev -- --host 
+    command: npm run dev -- --host
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
 
 volumes:
   db_data:

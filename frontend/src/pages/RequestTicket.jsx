@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import TicketPrint from "../components/TicketPrint";
+
 
 // const IP_SERVER = `${import.meta.env.VITE_API_URL}:8010`
 const IP_SERVER = `192.168.25.251:8010`
@@ -9,6 +11,8 @@ const NAMES = { NORMAL: 'Normal', PRIORITARIA: 'Prioritária' }
 export default function RequestTicket() {
   const [services, setServices] = useState([]);
   const [lastTicketCreated, setLastTicketCreated] = useState(null);
+  const [typeTicket, setTypeTicket] = useState(null);
+  const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
     document.body.style.background = "#DDD";
@@ -16,7 +20,7 @@ export default function RequestTicket() {
     fetch(`${API_BASE}/services`).then(res => res.json()).then(setServices);
   }, []);
 
-  const handleCreateTicket = async (id, type) => {    
+  const handleCreateTicket = async (id) => {
     if (!id && !type) return;
 
     const res = await fetch(`${API_BASE}/tickets`, {
@@ -24,7 +28,7 @@ export default function RequestTicket() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         service_id: id,
-        type: type
+        type: typeTicket
       })
     });
 
@@ -35,6 +39,7 @@ export default function RequestTicket() {
 
     const data = await res.json();
     setLastTicketCreated(data);
+    setPrinting(true);
   };
 
   const serviceOptions = services.map((s) => (
@@ -44,82 +49,130 @@ export default function RequestTicket() {
   ));
 
   return (
-    <div
-      style={{
-        borderRadius: "12px",
-        background: "#ffffff",
+    <>{!printing && !typeTicket && (
+      <div style={{
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
         padding: "16px",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
-      }}
-    >
-      <h2>Gerar Senha</h2>
-      {services && (
-        services.map((s) => (
-          <><div key={s.id} style={{
-            marginBottom: "20px",
-          }}>
-            <div style={{
-              fontSize: "1.5rem",
-              fontWeight: "bold",
-            }}>{s.name}</div>
+        gap: "2rem",
+        boxSizing: "border-box",
+      }}>
+        <div style={{
+          fontSize: "2rem",
+          fontWeight: "bold",
+          textTransform: "uppercase",
+          fontFamily: "'Arial', sans-serif"
 
-            <div style={{
+        }}>Solicite sua senha</div>
+        <button style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontSize: "8vw",
+          fontWeight: "bold",
+          textTransform: "uppercase",
+          padding: "2rem",
+          borderRadius: "16px",
+          border: "none",
+          backgroundColor: "#723EBE",
+          color: "#FFF",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+          cursor: "pointer",
+        }}
+          onClick={() => { setTypeTicket('NORMAL') }} >Senha Normal</button>
+        <button style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontSize: "8vw",
+          fontWeight: "bold",
+          textTransform: "uppercase",
+          padding: "2rem",
+          borderRadius: "16px",
+          border: "none",
+          backgroundColor: "#339324",
+          color: "#FFF",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+          cursor: "pointer",
+        }}
+          onClick={() => { setTypeTicket('PRIORITY') }}>
+          Senha Prioritária</button>
+      </div>
+    )}
+      {!printing && typeTicket && (
+        <div style={{
+          height: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: "16px",
+          gap: "2rem",
+          boxSizing: "border-box",
+        }}>
+          <div style={{
+            fontSize: "2rem",
+            fontWeight: "bold",
+            textTransform: "uppercase",
+            fontFamily: "'Arial', sans-serif"
+          }}>SENHA {typeTicket == 'NORMAL' ? 'NORMAL' : 'PRIORITÁRIA'}</div>
+          {services && services.map((s) => (<>
+            <button style={{
+              width: "100%",
+              height: "100%",
               display: "flex",
-              gap: "1rem",
-            }}>
-              <button style={{
-                marginTop: "8px",
-                padding: "10px",
-                borderRadius: "8px",
-                border: "none",
-                background: "#723EBE",
-                color: "#ffffff",
-                fontWeight: "bold",
-                cursor: "pointer",
-                fontSize: "2rem",
-                width: "100%",
-              }} onClick={() => handleCreateTicket(s.id, 'NORMAL')}>
-                {NAMES.NORMAL}
-              </button>
-              <button style={{
-                marginTop: "8px",
-                padding: "10px",
-                borderRadius: "8px",
-                border: "none",
-                background: "#9B1C1C",
-                color: "#ffffff",
-                fontWeight: "bold",
-                cursor: "pointer",
-                fontSize: "2rem",
-                width: "100%",
-              }} onClick={() => handleCreateTicket(s.id, 'PRIORITY')}>
-                {NAMES.PRIORITARIA}
-              </button>
-            </div>
-          </div>
-          </>
-        ))
-      )}
-
-      {lastTicketCreated && (
-        <div
-          style={{
-            marginTop: "16px",
-            padding: "12px",
-            borderRadius: "8px",
-            background: "#e0f2fe"
-          }}
-        >
-          <strong>Senha gerada:</strong>{" "}
-          <span style={{ fontSize: "1.5rem" }}>
-            {lastTicketCreated.display_code}
-          {" "}
-          ({lastTicketCreated.type === "PRIORITY" ? "Prioritária" : "Normal"}
-          )</span>
-          <br />
-          <strong>Serviço:</strong> {lastTicketCreated.service.name}
+              justifyContent: "center",
+              alignItems: "center",
+              fontSize: "3rem",
+              fontWeight: "bold",
+              textTransform: "uppercase",
+              padding: "2rem",
+              borderRadius: "16px",
+              border: "none",
+              backgroundColor: typeTicket == "NORMAL" ? "#723EBE" : "#339324",
+              color: "#FFF",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+              cursor: "pointer",
+            }}
+              onClick={() => handleCreateTicket(s.id)}>
+              {s.name}
+            </button>
+          </>))}
+          <button style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              fontSize: "3rem",
+              fontWeight: "bold",
+              textTransform: "uppercase",
+              padding: "2rem",
+              borderRadius: "16px",
+              border: "none",
+              backgroundColor: "#9B1C1C",
+              color: "#FFF",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+              cursor: "pointer",
+            }}
+              onClick={() => setTypeTicket(null)}>
+              Voltar
+            </button>
         </div>
       )}
-    </div>
+      {printing && lastTicketCreated && (
+        <>
+          <TicketPrint ticket={lastTicketCreated} onPrinted={() =>
+            setTimeout(() => (setPrinting(false), setTypeTicket(null)), 800)} />
+        </>
+      )}
+    </>
   );
 }
