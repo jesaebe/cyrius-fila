@@ -26,6 +26,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship, Session
 from dotenv import load_dotenv
 
+from escpos.printer import Network
+
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -343,3 +345,39 @@ async def websocket_board(websocket: WebSocket):
             await websocket.receive_text()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+
+
+# ------------ PRINTER---------------- #
+PRINTER_IP = "192.168.25.200"  # alterar para o seu IP
+PRINTER_PORT = 9100
+
+printer = Network(PRINTER_IP, PRINTER_PORT)
+
+def print_ticket(display_code, service_name, priority=False):
+    try:
+        printer.set(align="center")
+        printer.set(width=2, height=1, custom_size=True)
+        printer.text("SENHA\n")
+        printer.set(width=5, height=2,custom_size=True)
+        printer.text(f"{display_code}\n\n")
+
+        printer.set(width=1, height=1, custom_size=True)
+        printer.text(f"{service_name}\n")
+
+        if priority:
+            printer.text("*** PRIORITÁRIA ***\n")
+
+        printer.text("\n---------------------\n")
+        printer.cut()
+        
+    except Exception as e:
+        print("Erro ao imprimir:", e)
+
+@app.post("/print")
+def print_api(ticket: TicketOut):
+    print_ticket(
+        ticket.display_code,
+        ticket.service.name,
+        ticket.type == "PRIORITY"
+    )
+    return {"status": "printed"}
