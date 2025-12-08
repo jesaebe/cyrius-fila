@@ -3,8 +3,8 @@ import { useCounter } from "../hooks/useCounter";
 import SelectCounterModal from "../components/SelectCounterModal";
 
 // const IP_SERVER = `${import.meta.env.VITE_API_URL}:8010`
-const IP_SERVER = `192.168.25.251:8010`
-const API_BASE = `http://${IP_SERVER}`;
+
+const API_BASE = `${import.meta.env.VITE_API_URL}:8010`;
 const NAMES = { NORMAL: 'Normal', PRIORITARIA: 'Prioritária' }
 
 
@@ -16,12 +16,15 @@ export default function CallDesk() {
   const [currentCalled, setCurrentCalled] = useState(null);
 
   useEffect(() => {
-    fetch(`${API_BASE}/services`)
+    loadTickets();
+  }, [selectedCounter]);
+  
+  const loadTickets = () => {    
+    fetch(`${API_BASE}/services-ticket`)
       .then((r) => r.json())
       .then(setServices)
       .catch(console.error);
-  }, [selectedCounter]);
-
+  }
   const handleCallNext = async (id, type) => {
     const res = await fetch(`${API_BASE}/attendant/call-next`, {
       method: "POST",
@@ -47,14 +50,26 @@ export default function CallDesk() {
     // currentCalled será atualizado também via WebSocket, mas
     // atualizamos aqui para resposta imediata do atendente
     setCurrentCalled(data);
+    loadTickets();
   };
 
-  const serviceOptions = services.map((s) => (
-    <option key={s.id} value={s.id}>
-      {s.name} ({s.code})
-    </option>
-  ));
+  const callAgainTicket = async (ticketId) => {
+    await fetch(`${API_BASE}/attendant/repeat/${ticketId}`, {
+      method: "POST"
+    });
+  }
 
+  const cancelTicket = async (ticketId) => {
+    const res = await fetch(`${API_BASE}/attendant/cancel/${ticketId}`, {
+      method: "PUT"
+    });
+
+    if (res.status == 204){
+      alert("Senha Cancelada com sucesso!");
+      setCurrentCalled(null);
+      return
+    }
+  }
 
   return (
 
@@ -71,48 +86,48 @@ export default function CallDesk() {
       {!selectedCounter && (
         <SelectCounterModal onSelect={(c) => { counter.set(c); setSelectedCounter(c); }} />
       )}
+      <div style={{
+        display: "flex",
+        gap: "1rem",
+      }}>
+        <div style={{
+          fontSize: "1.5rem",
+          fontWeight: "bold",
+          width: "100%",
+        }}>{NAMES.NORMAL}</div>
+        <div style={{
+          fontSize: "1.5rem",
+          fontWeight: "bold",
+          width: "100%",
+        }}>{NAMES.PRIORITARIA}</div>
+      </div>
       {services && (
         services.map((s) => (
           <><div key={s.id} style={{
             marginBottom: "20px",
           }}>
-            <div style={{
-              fontSize: "1.5rem",
-              fontWeight: "bold",
-            }}>{s.name}</div>
 
             <div style={{
               display: "flex",
               gap: "1rem",
             }}>
-              <button style={{
-                marginTop: "8px",
-                padding: "10px",
-                borderRadius: "8px",
-                border: "none",
-                background: "#723EBE",
-                color: "#ffffff",
-                fontWeight: "bold",
-                cursor: "pointer",
-                fontSize: "2rem",
-                width: "100%",
-              }} onClick={() => handleCallNext(s.id, 'NORMAL')}>
-                {NAMES.NORMAL}
-              </button>
-              <button style={{
-                marginTop: "8px",
-                padding: "10px",
-                borderRadius: "8px",
-                border: "none",
-                background: "#9B1C1C",
-                color: "#ffffff",
-                fontWeight: "bold",
-                cursor: "pointer",
-                fontSize: "2rem",
-                width: "100%",
-              }} onClick={() => handleCallNext(s.id, 'PRIORITY')}>
-                {NAMES.PRIORITARIA}
-              </button>
+
+              {s.tickets.map((t) => (
+                <button style={{
+                  marginTop: "8px",
+                  padding: "10px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background: t.type == "NORMAL" ? "#723EBE" : "#339324",
+                  color: "#ffffff",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  fontSize: "2rem",
+                  width: "100%",
+                }} onClick={() => handleCallNext(s.id, t.type)}>
+                  {s.name} ({t.total_ticket})
+                </button>
+              ))}
             </div>
           </div>
           </>
@@ -125,19 +140,53 @@ export default function CallDesk() {
             marginTop: "16px",
             padding: "12px",
             borderRadius: "8px",
-            background: "#ecfdf5"
+            background: "#ecfdf5",
+            display: "flex"
           }}
         >
-          <h3>Senha atual chamada</h3>
-          <div style={{ fontSize: "2rem", fontWeight: "bold" }}>
-            {currentCalled.display_code}
+          <div style={{ width: "100%" }}>
+            <h3>Senha atual chamada</h3>
+            <div style={{ fontSize: "2rem", fontWeight: "bold" }}>
+              {currentCalled.display_code}
+            </div>
+            <div>
+              Serviço: {currentCalled.service.name} ({currentCalled.service.code})
+            </div>
+            <div>
+              Tipo:{" "}
+              {currentCalled.type === "PRIORITY" ? NAMES.PRIORITARIA : NAMES.NORMAL}
+            </div>
           </div>
-          <div>
-            Serviço: {currentCalled.service.name} ({currentCalled.service.code})
-          </div>
-          <div>
-            Tipo:{" "}
-            {currentCalled.type === "PRIORITY" ? NAMES.PRIORITARIA : NAMES.NORMAL}
+          <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <button style={{
+              marginTop: "8px",
+              padding: "10px",
+              borderRadius: "8px",
+              border: "none",
+              background: "#245a93",
+              color: "#ffffff",
+              fontWeight: "bold",
+              cursor: "pointer",
+              fontSize: "2rem",
+              width: "100%",
+            }} onClick={() => callAgainTicket(currentCalled.id)}>
+              Chamar Novamente
+            </button>
+            <button style={{
+              marginTop: "8px",
+              padding: "10px",
+              borderRadius: "8px",
+              border: "none",
+              background: "#9B1C1C",
+              color: "#ffffff",
+              fontWeight: "bold",
+              cursor: "pointer",
+              fontSize: "2rem",
+              width: "100%",
+            }} onClick={() => cancelTicket(currentCalled.id)}>            
+              Cancelar Senha
+            </button>
+
           </div>
         </div>
       )}

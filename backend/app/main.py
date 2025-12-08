@@ -22,6 +22,7 @@ from sqlalchemy import (
     Enum as SAEnum,
     func,
     text,
+    case
 )
 from sqlalchemy.orm import sessionmaker, declarative_base, relationship, Session
 from dotenv import load_dotenv
@@ -101,6 +102,21 @@ class ServiceOut(BaseModel):
     id: int
     name: str
     code: str
+
+    class Config:
+        from_attributes = True
+
+class ServiceTicketCount(BaseModel):    
+    type: TicketType
+    total_ticket: int
+    class Config:
+        from_attributes = True
+
+class ServiceTicketOut(BaseModel):
+    id: int
+    name: str
+    code: str
+    tickets: Optional[List[ServiceTicketCount]] = None
 
     class Config:
         from_attributes = True
@@ -217,6 +233,7 @@ def on_startup():
                 Counter(name="Guichê 02", code="02"),
                 Counter(name="Guichê 03", code="03"),
                 Counter(name="Guichê 04", code="04"),
+                Counter(name="Guichê 05", code="05"),
             ]
             db.add_all(counters)
             db.commit()
@@ -229,6 +246,47 @@ def on_startup():
 def list_services(db: Session = Depends(get_db)):
     return db.query(Service).order_by(Service.name).all()
 
+@app.get("/services-ticket", response_model=List[ServiceTicketOut])
+def list_services_ticket(db: Session = Depends(get_db)):
+
+    # retorna contagem agrupada por serviço e tipo
+    counts = (
+        db.query(
+            Ticket.service_id,
+            Ticket.type,            
+            func.count().label("total")
+        )
+        .filter(Ticket.status == TicketStatus.WAITING, func.date(Ticket.created_at) == func.current_date(),)
+        .group_by(Ticket.service_id, Ticket.type)
+        .all()
+    )
+
+    # transforma em dicionário para fácil acesso
+    service_map = {}
+    for service_id, type, total in counts:
+        service_map.setdefault(service_id, {})[type] = total
+
+    # Agora monta saída final
+    services = db.query(Service).order_by(Service.name).all()
+    result = []
+
+    for s in services:
+        normal = service_map.get(s.id, {}).get(TicketType.NORMAL, 0)
+        priority = service_map.get(s.id, {}).get(TicketType.PRIORITY, 0)
+
+        result.append(
+            ServiceTicketOut(
+                id=s.id,
+                name=s.name,
+                code=s.code,
+                tickets=[
+                    ServiceTicketCount(type=TicketType.NORMAL, total_ticket=normal),
+                    ServiceTicketCount(type=TicketType.PRIORITY, total_ticket=priority),
+                ]
+            )
+        )
+
+    return result
 
 @app.get("/counters", response_model=List[CounterOut])
 def list_counters(db: Session = Depends(get_db)):
@@ -244,7 +302,9 @@ def create_ticket(payload: TicketCreate, db: Session = Depends(get_db)):
     # Busca o último número para o serviço
     last_number = (
         db.query(func.max(Ticket.number))
-        .filter(Ticket.service_id == service.id)
+        .filter(
+            Ticket.service_id == service.id,
+            func.date(Ticket.created_at) == func.current_date())
         .scalar()
     )
     next_number = (last_number or 0) + 1
@@ -268,7 +328,7 @@ def create_ticket(payload: TicketCreate, db: Session = Depends(get_db)):
 def list_last_called(limit: int = 6, db: Session = Depends(get_db)):
     tickets = (
         db.query(Ticket)
-        .filter(Ticket.status == TicketStatus.CALLED)
+        .filter(Ticket.status == TicketStatus.CALLED, func.date(Ticket.created_at) == func.current_date())
         .order_by(Ticket.called_at.desc())
         .limit(limit)
         .all()
@@ -292,7 +352,8 @@ def call_next(
         .filter(
             Ticket.service_id == service.id,
             Ticket.status == TicketStatus.WAITING,
-            Ticket.type == payload.type
+            Ticket.type == payload.type,
+            func.date(Ticket.created_at) == func.current_date()
         ).first()
     )
 
@@ -304,9 +365,6 @@ def call_next(
     next_ticket.called_by_id = payload.counter_id
     db.commit()
     db.refresh(next_ticket)
-
-    # buscar o guichê
-    counter = db.get(Counter, payload.counter_id)
 
     # Notifica os painéis conectados
     message = {
@@ -331,6 +389,62 @@ def call_next(
     background_tasks.add_task(manager.broadcast, message)
 
     return next_ticket
+
+@app.post("/attendant/repeat/{ticket_id}", response_model=TicketOut)
+def repeat_call(ticket_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Senha não encontrada")
+
+    if ticket.status != TicketStatus.CALLED:
+        raise HTTPException(
+            status_code=400,
+            detail="Só é possível repetir uma senha já chamada."
+        )
+
+    # Atualiza timestamp para registrar nova chamada
+    ticket.called_at = func.now()
+    db.commit()
+    db.refresh(ticket)
+
+    # Envia atualização ao painel via websocket  
+
+    message = {
+        "event": "ticket_called",
+        "ticket": {
+            "id": ticket.id,
+            "display_code": ticket.display_code,
+            "type": ticket.type.value,
+            "service": {
+                "id": ticket.service.id,
+                "name": ticket.service.name,
+                "code": ticket.service.code,
+            },
+            "called_by": {
+                "id": ticket.called_by.id,
+                "name": ticket.called_by.name,
+                "code": ticket.called_by.code,
+            },
+        },
+    }
+
+    background_tasks.add_task(manager.broadcast, message)
+
+    return ticket
+
+@app.put("/attendant/cancel/{ticket_id}", status_code=204)
+def cancel_ticket(ticket_id: int, db: Session = Depends(get_db)):
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Senha não encontrada")
+    
+    # Atualiza timestamp para registrar o cancelamento
+    ticket.status = TicketStatus.CANCELLED
+    ticket.called_at = func.now()
+    db.commit()
+    db.refresh(ticket)
 
 
 # ---------- WEBSOCKET PARA PAINEL ----------

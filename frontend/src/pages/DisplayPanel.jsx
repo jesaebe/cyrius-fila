@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import dingSoundFile from "../assets/alert.mp3";
 
 // const IP_SERVER = `${import.meta.env.VITE_API_URL}:8010`
-const IP_SERVER = `192.168.25.251:8010`
-const API_BASE = `http://${IP_SERVER}`;
+const API_BASE = `${import.meta.env.VITE_API_URL}:8010`;
+const API_WS = `${import.meta.env.VITE_API_WS}:8010`;
 
-const NAMES = {NORMAL: 'Normal', PRIORITARIA: 'Prioritária'}
+const NAMES = { NORMAL: 'Normal', PRIORITARIA: 'Prioritária' }
 
 export default function DisplayPanel() {
   const [callList, setCallList] = useState([]);
@@ -18,6 +18,15 @@ export default function DisplayPanel() {
   });
   const [lastCalledList, setLastCalledList] = useState([]);
 
+  const dingRef = useRef(null);
+
+  // cria UMA instância do áudio
+  useEffect(() => {
+    const audio = new Audio(dingSoundFile);
+    audio.preload = "auto";
+    audio.volume = 1;
+    dingRef.current = audio;
+  }, []);
 
 
   useEffect(() => {
@@ -28,7 +37,7 @@ export default function DisplayPanel() {
       speechSynthesis.speak(utterance);
     };
 
-    document.body.style.background = "#723EBE";
+    document.body.style.background = "#DDD";
     // Carregar últimas chamadas na inicialização
     fetch(`${API_BASE}/tickets/called`)
       .then((r) => r.json())
@@ -36,19 +45,36 @@ export default function DisplayPanel() {
       .catch(console.error);
 
     // WebSocket para atualizações em tempo real
-    const ws = new WebSocket(`ws://${IP_SERVER}/ws/board`);
+    const ws = new WebSocket(`${API_WS}/ws/board`);
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      const dingSound = new Audio(dingSoundFile);
-      dingSound.volume = 0.9; // ajuste se quiser mais baixo ou alto
+      // const dingSound = new Audio(dingSoundFile);
+      // dingSound.volume = 0.9; // ajuste se quiser mais baixo ou alto
 
       if (data.event === "ticket_called") {
         const ticket = data.ticket;
 
         // 🔊 Ding dong
-        dingSound.currentTime = 0;
-        dingSound.play().catch(() => { });
+        // dingSound.currentTime = 0;
+        // dingSound.play().catch(() => { });
+
+        const ding = dingRef.current;
+        if (ding) {
+          try {
+            // garante que sempre comece do início
+            ding.pause();
+            ding.currentTime = 0;
+            const playPromise = ding.play();
+            if (playPromise && playPromise.catch) {
+              playPromise.catch((err) =>
+                console.log("Erro ao tocar som:", err)
+              );
+            }
+          } catch (e) {
+            console.log("Erro no áudio:", e);
+          }
+        }
 
         //🧠 Transformando código em leitura verbal
         const code = ticket.display_code
@@ -73,6 +99,7 @@ export default function DisplayPanel() {
             },
             ...prev
           ];
+          console.log(newList.slice(1, 6));
           setLastCalledList(newList.slice(1, 6));
           return newList;
         });
@@ -95,8 +122,8 @@ export default function DisplayPanel() {
   return (
     <div
       style={{
-        background: "#723EBE",
-        color: "#f9fafb",
+        background: "#DDD",
+        color: "#000",
         padding: "16px",
       }}
     >
@@ -109,7 +136,7 @@ export default function DisplayPanel() {
             marginBottom: "2rem",
             borderRadius: "10px",
             background:
-              currentCalled.type === "PRIORITY" ? "#9b1c1c" : "rgba(31,41,55,0.9)",
+              currentCalled.type === "PRIORITY" ? "#339324" : "#723EBE",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -120,7 +147,8 @@ export default function DisplayPanel() {
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            justifyContent: "center"
+            justifyContent: "center",
+            color: "#FFF",
           }}>
             <div style={{ fontSize: "2.5rem" }}>Senha</div>
             <div style={{ fontSize: "25vw", fontWeight: "bold" }}>
@@ -133,13 +161,14 @@ export default function DisplayPanel() {
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            justifyContent: "center"
+            justifyContent: "center",
+            color: "#FFF",
           }}>
             <div style={{ fontSize: "2.5rem" }}>Guichê</div>
             <div style={{ fontSize: "25vw", fontWeight: "bold" }}>
               {currentCalled.called_by.code}
             </div>
-            <div style={{ fontSize: "2.5rem", opacity: 0.8 }}>
+            <div style={{ fontSize: "2.5rem" }}>
               {currentCalled.type === "PRIORITY" ? NAMES.PRIORITARIA : NAMES.NORMAL}
             </div>
           </div>
@@ -159,11 +188,12 @@ export default function DisplayPanel() {
               padding: "12px",
               borderRadius: "10px",
               background:
-                t.type === "PRIORITY" ? "#9b1c1c" : "rgba(31,41,55,0.9)",
+                t.type === "PRIORITY" ? "#339324" : "rgba(31,41,55,0.9)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: "2rem"
+              gap: "2rem",
+              color: "#FFF"
 
             }}
           >
@@ -190,7 +220,7 @@ export default function DisplayPanel() {
               <div style={{ fontSize: "4.5vw", fontWeight: "bold" }}>
                 {t.called_by.code}
               </div>
-              <div style={{ fontSize: "1.2vw", opacity: 0.8 }}>
+              <div style={{ fontSize: "1.2vw" }}>
                 {t.type === "PRIORITY" ? NAMES.PRIORITARIA : NAMES.NORMAL}
               </div>
             </div>

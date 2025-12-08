@@ -3,8 +3,7 @@ import TicketPrint from "../components/TicketPrint";
 
 
 // const IP_SERVER = `${import.meta.env.VITE_API_URL}:8010`
-const IP_SERVER = `192.168.25.251:8010`
-const API_BASE = `http://${IP_SERVER}`;
+const API_BASE = `${import.meta.env.VITE_API_URL}:8010`;
 const NAMES = { NORMAL: 'Normal', PRIORITARIA: 'Prioritária' }
 
 
@@ -14,7 +13,7 @@ export default function RequestTicket() {
   const [typeTicket, setTypeTicket] = useState(null);
   const [printing, setPrinting] = useState(false);
 
-  useEffect(() => {
+  useEffect(() => {    
     document.body.style.background = "#DDD";
 
     fetch(`${API_BASE}/services`).then(res => res.json()).then(setServices);

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 
-const IP_SERVER = "192.168.25.251"
-const API_BASE = `http://${IP_SERVER}:8010`;
+const API_BASE = `${import.meta.env.VITE_API_URL}:8010`;
 
 export default function SelectCounterModal({ onSelect }) {
   const [counters, setCounters] = useState([]);
