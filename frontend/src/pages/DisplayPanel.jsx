@@ -17,8 +17,12 @@ export default function DisplayPanel() {
     called_by: { code: "00" }
   });
   const [lastCalledList, setLastCalledList] = useState([]);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
 
   const dingRef = useRef(null);
+  const wsRef = useRef(null);
+  const lastSoundTimeRef = useRef(0);
+  const lastSpokenKeyRef = useRef(null);
 
   // cria UMA instância do áudio
   useEffect(() => {
@@ -28,64 +32,99 @@ export default function DisplayPanel() {
     dingRef.current = audio;
   }, []);
 
+  const voiceEnabledRef = useRef(false);
+  useEffect(() => {
+    voiceEnabledRef.current = voiceEnabled;
+  }, [voiceEnabled])
+
+  const playDing = () => {
+    const now = Date.now();
+    if (now - lastSoundTimeRef.current < 1000) {
+      return;
+    }
+    lastSoundTimeRef.current = now;
+
+    const audio = dingRef.current;
+    if (!audio) return;
+
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+      console.log('Tocando');
+      
+      const p = audio.play();
+      if (p && p.catch) {
+        p.catch((err) => console.warn("Erro ao tocar som:", err));
+      }      
+    } catch (e) {
+      console.warn("Erro ao tocar audio:", e);
+    }
+  }
+
+  const speakTicket = (ticket) => {
+    if (!voiceEnabledRef.current) return;
+    console.log(!("speechSynthesis" in window));
+    
+    // if (!("speechSynthesis" in window)) return;
+
+    const key = `${ticket.id}-${ticket.display_code}-${ticket.called_by.code}`;
+    console.log(lastSpokenKeyRef.current == key);
+    
+    if (lastSpokenKeyRef.current == key) return;
+    lastSpokenKeyRef.current = key;
+
+    const utterance = new SpeechSynthesisUtterance();
+    utterance.lang = "pt-BR";
+    utterance.rate = 0.9; // velocidade (0.5 mais lento — 1 normal)
+    utterance.pitch = 1.0;
+
+    const code = ticket.display_code
+      .split("")
+      .map((c) => (/[0-9]/.test(c) ? c : `${c}`))
+      .join(" ");
+
+    utterance.text = `Senha ${code} — Guichê ${ticket.called_by.code}. ${ticket.type === 'PRIORITY' ? NAMES.PRIORITARIA : ''}`;
+
+    try {
+      console.log("Chamando Senha");
+      
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.warn("Erro no TTS:", e);
+    }
+
+  }
 
   useEffect(() => {
-    const speakText = (text) => {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "pt-BR";
-      utterance.rate = 0.9; // velocidade (0.5 mais lento — 1 normal)
-      speechSynthesis.speak(utterance);
-    };
-
     document.body.style.background = "#DDD";
     // Carregar últimas chamadas na inicialização
     fetch(`${API_BASE}/tickets/called`)
       .then((r) => r.json())
-      .then(setCallList)
+      .then((data) => {
+        setVoiceEnabled(true);
+        if (data[0]) {
+          setCallList(data);
+          setCurrentCalled(data[0]);
+          setLastCalledList(data.slice(1, 6));
+        }
+      })
       .catch(console.error);
 
     // WebSocket para atualizações em tempo real
     const ws = new WebSocket(`${API_WS}/ws/board`);
+    wsRef.current = ws;
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      // const dingSound = new Audio(dingSoundFile);
-      // dingSound.volume = 0.9; // ajuste se quiser mais baixo ou alto
 
       if (data.event === "ticket_called") {
         const ticket = data.ticket;
 
-        // 🔊 Ding dong
-        // dingSound.currentTime = 0;
-        // dingSound.play().catch(() => { });
-
-        const ding = dingRef.current;
-        if (ding) {
-          try {
-            // garante que sempre comece do início
-            ding.pause();
-            ding.currentTime = 0;
-            const playPromise = ding.play();
-            if (playPromise && playPromise.catch) {
-              playPromise.catch((err) =>
-                console.log("Erro ao tocar som:", err)
-              );
-            }
-          } catch (e) {
-            console.log("Erro no áudio:", e);
-          }
-        }
-
-        //🧠 Transformando código em leitura verbal
-        const code = ticket.display_code
-          .split("")
-          .map((c) => (/[0-9]/.test(c) ? c : `${c}`))
-          .join(" ");
-
-        const spokenText = `Senha ${code} — Guichê ${ticket.called_by.code}. ${ticket.type === 'PRIORITY' ? NAMES.PRIORITARIA : ''}`;
-
-        // 👄 Fala a senha
-        speakText(spokenText);
+        playDing();
+        setTimeout(() => {
+          speakTicket(ticket);          
+        }, 1000);
 
         setCurrentCalled(ticket);
         setCallList((prev) => {
@@ -103,8 +142,12 @@ export default function DisplayPanel() {
           setLastCalledList(newList.slice(1, 6));
           return newList;
         });
-      }
+      }      
     };
+
+    ws.onerror = (err) => {
+      console.error("WS Error:", e);      
+    }
 
     // mantemos conexão mandando "ping"
     const interval = setInterval(() => {

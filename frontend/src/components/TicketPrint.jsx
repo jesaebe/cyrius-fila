@@ -17,19 +17,20 @@ export default function TicketPrint({ ticket, onPrinted }) {
   }, [printed, onPrinted]);
 
   return (
-    <div ref={printRef} className="print-ticket">
-      <h2 style={{ textAlign: "center", margin: 0 }}>Sua Senha</h2>
+    <div ref={printRef} className="print-ticket" style={{opacity: 1}}>
+      <div style={{ textAlign: "center", fontSize: '.8rem', margin: 0 }}>1º Cartório de Registro de Imóveis e Hipotecas de Vitória da Conquista</div>      
       <h1 style={{ 
         fontSize: "5rem", 
         textAlign: "center",
-        margin: "10px 0"
+        margin: 0
       }}>
         {ticket.display_code}
       </h1>
-      <div style={{ textAlign: "center" }}>
+      <div style={{ textAlign: "center", marinBottom: '5px' }}>
         <strong>{ticket.service.name}</strong><br />
         {ticket.type === "PRIORITY" ? "PRIORITÁRIA" : "NORMAL"}
       </div>
+      <div style={{ textAlign: "center", fontSize: '.8rem', margin: 0 }}>{new Date(ticket.created_at).toLocaleString('pt-BR', { dateStyle: "short", timeStyle: 'medium' }).replace(',','')}</div>
     </div>
   );
 }

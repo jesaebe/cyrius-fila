@@ -1,7 +1,7 @@
 import os
 from typing import List, Optional
 from enum import Enum
-
+from datetime import datetime
 from fastapi import (
     FastAPI,
     Depends,
@@ -144,6 +144,7 @@ class TicketOut(BaseModel):
     status: TicketStatus
     service: ServiceOut
     called_by: Optional[CounterOut] = None
+    created_at: datetime
 
     class Config:
         from_attributes = True
@@ -220,9 +221,11 @@ def on_startup():
     with SessionLocal() as db:
         if db.query(Service).count() == 0:
             services = [
-                Service(name="Atendimento Geral", code="A"),
-                Service(name="Caixa", code="C"),
-                Service(name="Informações", code="I"),
+                Service(name="Certidão Solicitação", code="S"),
+                Service(name="Certidão Retorno", code="C"),
+                Service(name="Certidão ADV", code="A"),
+                Service(name="Retorno", code="R"),
+                Service(name="Retorno ADV", code="D"),
             ]
             db.add_all(services)
             db.commit()
@@ -315,7 +318,7 @@ def create_ticket(payload: TicketCreate, db: Session = Depends(get_db)):
         display_code=display_code,
         type=payload.type,
         status=TicketStatus.WAITING,
-        service_id=service.id,
+        service_id=service.id,        
     )
     db.add(ticket)
     db.commit()
@@ -354,6 +357,10 @@ def call_next(
             Ticket.status == TicketStatus.WAITING,
             Ticket.type == payload.type,
             func.date(Ticket.created_at) == func.current_date()
+        ).order_by(
+            Ticket.number.asc(),        # mais antigo primeiro
+            Ticket.created_at.asc(),    # desempate
+            Ticket.id.asc(),            # desempate extra
         ).first()
     )
 

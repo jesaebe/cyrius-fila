@@ -12,40 +12,50 @@ export default function RequestTicket() {
   const [lastTicketCreated, setLastTicketCreated] = useState(null);
   const [typeTicket, setTypeTicket] = useState(null);
   const [printing, setPrinting] = useState(false);
+  const [creating, setCreating] = useState(false);
 
-  useEffect(() => {    
+  useEffect(() => {
     document.body.style.background = "#DDD";
 
-    fetch(`${API_BASE}/services`).then(res => res.json()).then(setServices);
+    fetch(`${API_BASE}/services`).then(res => res.json()).then((data) => {
+      console.log(data.filter(d => d.id == 2 || d.id == 3 || d.id == 5));
+      data = data.filter(d => d.id == 2 || d.id == 3 || d.id == 5)
+
+      setServices(data);
+    });
   }, []);
 
   const handleCreateTicket = async (id) => {
-    if (!id && !type) return;
+    if (!id && !typeTicket) return;
+    if (creating) return;
+    setCreating(true);
 
-    const res = await fetch(`${API_BASE}/tickets`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        service_id: id,
-        type: typeTicket
-      })
-    });
+    try {
+      const res = await fetch(`${API_BASE}/tickets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          service_id: id,
+          type: typeTicket
+        })
+      });
 
-    if (!res.ok) {
-      alert("Erro ao gerar senha");
-      return;
+      if (!res.ok) {
+        alert("Erro ao gerar senha");
+        return;
+      }
+
+      const data = await res.json();
+      console.log(data);
+
+      setLastTicketCreated(data);
+      setPrinting(true);
+    } catch (e) {
+      console.error("Erro ao gerar senha:", e);
+    } finally {
+      setCreating(false);
     }
-
-    const data = await res.json();
-    setLastTicketCreated(data);
-    setPrinting(true);
   };
-
-  const serviceOptions = services.map((s) => (
-    <option key={s.id} value={s.id}>
-      {s.name} ({s.code})
-    </option>
-  ));
 
   return (
     <>{!printing && !typeTicket && (
@@ -122,7 +132,7 @@ export default function RequestTicket() {
             textTransform: "uppercase",
             fontFamily: "'Arial', sans-serif"
           }}>SENHA {typeTicket == 'NORMAL' ? 'NORMAL' : 'PRIORITÁRIA'}</div>
-          {services && services.map((s) => (<>
+          {typeTicket == 'NORMAL' && services && services.map((s) => (<>
             <button style={{
               width: "100%",
               height: "100%",
@@ -144,7 +154,8 @@ export default function RequestTicket() {
               {s.name}
             </button>
           </>))}
-          <button style={{
+          {typeTicket != 'NORMAL' && (<>
+            <button style={{
               width: "100%",
               height: "100%",
               display: "flex",
@@ -156,14 +167,35 @@ export default function RequestTicket() {
               padding: "2rem",
               borderRadius: "16px",
               border: "none",
-              backgroundColor: "#9B1C1C",
+              backgroundColor: typeTicket == "NORMAL" ? "#723EBE" : "#339324",
               color: "#FFF",
               boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
               cursor: "pointer",
             }}
-              onClick={() => setTypeTicket(null)}>
-              Voltar
+              onClick={() => handleCreateTicket(2)}>
+              Certidão Retorno
             </button>
+          </>)}
+          <button style={{
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            fontSize: "3rem",
+            fontWeight: "bold",
+            textTransform: "uppercase",
+            padding: "2rem",
+            borderRadius: "16px",
+            border: "none",
+            backgroundColor: "#9B1C1C",
+            color: "#FFF",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+            cursor: "pointer",
+          }}
+            onClick={() => setTypeTicket(null)}>
+            Voltar
+          </button>
         </div>
       )}
       {printing && lastTicketCreated && (
