@@ -8,7 +8,8 @@ const NAMES = { NORMAL: 'Normal', PRIORITARIA: 'Prioritária' }
 
 
 export default function RequestTicket() {
-  const [services, setServices] = useState([]);
+  const [servicesNormal, setServicesNormal] = useState([]);
+  const [servicesPriority, setServicesPriority] = useState([]);
   const [lastTicketCreated, setLastTicketCreated] = useState(null);
   const [typeTicket, setTypeTicket] = useState(null);
   const [printing, setPrinting] = useState(false);
@@ -19,9 +20,10 @@ export default function RequestTicket() {
 
     fetch(`${API_BASE}/services`).then(res => res.json()).then((data) => {
       console.log(data.filter(d => d.id == 2 || d.id == 3 || d.id == 5));
-      data = data.filter(d => d.id == 2 || d.id == 3 || d.id == 5)
+      data = data.filter(d => d.id != 2)
 
-      setServices(data);
+      setServicesNormal(data.filter(d => d.id == 1 || d.id == 4));
+      setServicesPriority(data.filter(d => d.id != 2));
     });
   }, []);
 
@@ -132,7 +134,7 @@ export default function RequestTicket() {
             textTransform: "uppercase",
             fontFamily: "'Arial', sans-serif"
           }}>SENHA {typeTicket == 'NORMAL' ? 'NORMAL' : 'PRIORITÁRIA'}</div>
-          {typeTicket == 'NORMAL' && services && services.map((s) => (<>
+          {typeTicket == 'NORMAL' && servicesNormal && servicesNormal.map((s) => (<>
             <button style={{
               width: "100%",
               height: "100%",
@@ -154,7 +156,7 @@ export default function RequestTicket() {
               {s.name}
             </button>
           </>))}
-          {typeTicket != 'NORMAL' && (<>
+          {typeTicket != 'NORMAL' && servicesPriority && servicesPriority.map((s) => (<>
             <button style={{
               width: "100%",
               height: "100%",
@@ -172,10 +174,10 @@ export default function RequestTicket() {
               boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
               cursor: "pointer",
             }}
-              onClick={() => handleCreateTicket(2)}>
-              Certidão Retorno
+              onClick={() => handleCreateTicket(s.id)}>
+              {s.name}
             </button>
-          </>)}
+          </>))}
           <button style={{
             width: "100%",
             height: "100%",
