@@ -93,11 +93,9 @@ export default function DisplayPanel() {
     } catch (e) {
       console.warn("Erro no TTS:", e);
     }
-
   }
 
-  useEffect(() => {
-    document.body.style.background = "#DDD";
+  const getCalledList = () => {
     // Carregar últimas chamadas na inicialização
     fetch(`${API_BASE}/tickets/called`)
       .then((r) => r.json())
@@ -110,6 +108,12 @@ export default function DisplayPanel() {
         }
       })
       .catch(console.error);
+  }
+
+  
+  useEffect(() => {
+    document.body.style.background = "#DDD";
+    getCalledList();
 
     // WebSocket para atualizações em tempo real
     const ws = new WebSocket(`${API_WS}/ws/board`);
@@ -127,21 +131,22 @@ export default function DisplayPanel() {
         }, 1000);
 
         setCurrentCalled(ticket);
-        setCallList((prev) => {
-          const newList = [
-            {
-              id: ticket.id,
-              display_code: ticket.display_code,
-              type: ticket.type,
-              service: ticket.service,
-              called_by: ticket.called_by
-            },
-            ...prev
-          ];
-          console.log(newList.slice(1, 6));
-          setLastCalledList(newList.slice(1, 6));
-          return newList;
-        });
+        getCalledList();
+        // setCallList((prev) => {
+        //   const newList = [
+        //     {
+        //       id: ticket.id,
+        //       display_code: ticket.display_code,
+        //       type: ticket.type,
+        //       service: ticket.service,
+        //       called_by: ticket.called_by
+        //     },
+        //     ...prev
+        //   ];
+        //   console.log(newList.slice(1, 6));
+        //   setLastCalledList(newList.slice(1, 6));
+        //   return newList;
+        // });
       }      
     };
 
